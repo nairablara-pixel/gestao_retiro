@@ -27,6 +27,7 @@ export type TeamMember = {
   notes: string | null;
   color: string;
   has_password?: boolean;
+  roles?: Role[];
 };
 
 export type Deliverable = {

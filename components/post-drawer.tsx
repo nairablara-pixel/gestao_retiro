@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import type { EditorialPost, PostStatus, ProductionStep, Role, TeamMember } from "@/lib/types";
+import type { EditorialPost, PostStatus, ProductionStep, TeamMember } from "@/lib/types";
+import { useAuth } from "./providers";
 import {
   CHANNEL_LABEL,
   ROLE_LABEL,
@@ -18,7 +19,6 @@ type Props = {
   post: EditorialPost | "new" | null;
   steps: ProductionStep[];
   members: TeamMember[];
-  role: Role | null;
   onClose: () => void;
   onSaved: () => void;
 };
@@ -40,15 +40,16 @@ const emptyPost = {
   approval_comment: "",
 };
 
-export function PostDrawer({ post, steps, members, role, onClose, onSaved }: Props) {
+export function PostDrawer({ post, steps, members, onClose, onSaved }: Props) {
+  const { hasRole, isAdmin } = useAuth();
   const isNew = post === "new";
   const current = post && post !== "new" ? post : null;
   const [form, setForm] = useState(emptyPost);
   const [comment, setComment] = useState("");
   const [saving, setSaving] = useState(false);
-  const canEdit = role === "gestao" || role === "marketing" || role === "design";
+  const canEdit = hasRole("gestao", "marketing", "design");
   const canSendApproval = canEdit;
-  const isGestao = role === "gestao";
+  const isGestao = isAdmin;
 
   useEffect(() => {
     if (current) {
@@ -319,7 +320,7 @@ export function PostDrawer({ post, steps, members, role, onClose, onSaved }: Pro
               rows={3}
               className={inputClass}
               value={form.copy_text}
-              disabled={!(role === "gestao" || role === "marketing" || role === "redacao")}
+              disabled={!hasRole("gestao", "marketing", "redacao")}
               onChange={(e) => set("copy_text", e.target.value)}
             />
           </Field>
@@ -328,7 +329,7 @@ export function PostDrawer({ post, steps, members, role, onClose, onSaved }: Pro
               rows={3}
               className={inputClass}
               value={form.design_notes}
-              disabled={!(role === "gestao" || role === "design" || role === "marketing")}
+              disabled={!hasRole("gestao", "design", "marketing")}
               onChange={(e) => set("design_notes", e.target.value)}
             />
           </Field>
@@ -381,7 +382,7 @@ export function PostDrawer({ post, steps, members, role, onClose, onSaved }: Pro
             />
           </Field>
 
-          {!role && (
+          {!canEdit && (
             <p className="rounded-xl bg-[#f7ead0] px-4 py-2 text-sm text-[#7a5a12]">
               Entre com o e-mail cadastrado na equipe para salvar, enviar para
               OK ou aprovar.{" "}

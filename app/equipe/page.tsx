@@ -13,9 +13,9 @@ const ROLES: Role[] = ["gestao", "marketing", "design", "redacao", "audiovisual"
 
 export default function EquipePage() {
   const { members, loading, error, refresh } = useRetiroData();
-  const { role } = useAuth();
+  const { role, hasRole } = useAuth();
   const [open, setOpen] = useState<TeamMember | "new" | null>(null);
-  const canEdit = role === "gestao" || role === "marketing" || !role;
+  const canEdit = hasRole("gestao", "marketing") || !role;
 
   if (loading) return <p className="text-mist">Carregando equipe…</p>;
   if (error) return <p className="text-clay">{error}</p>;
@@ -31,7 +31,7 @@ export default function EquipePage() {
             que ela entra para enviar à aprovação ou dar o OK.
           </p>
         </div>
-        {(role === "gestao" || role === "marketing") && (
+        {hasRole("gestao", "marketing") && (
           <PrimaryButton onClick={() => setOpen("new")}>Adicionar pessoa</PrimaryButton>
         )}
       </header>

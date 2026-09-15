@@ -24,9 +24,9 @@ const STATUSES: DeliverableStatus[] = [
 
 export default function DesignsPage() {
   const { deliverables, members, loading, error, refresh } = useRetiroData();
-  const { role } = useAuth();
+  const { role, hasRole, isAdmin } = useAuth();
   const [open, setOpen] = useState<Deliverable | "new" | null>(null);
-  const canEdit = role === "gestao" || role === "design" || role === "marketing";
+  const canEdit = hasRole("gestao", "design", "marketing");
 
   if (loading) return <p className="text-mist">Carregando designs…</p>;
   if (error) return <p className="text-clay">{error}</p>;
@@ -114,7 +114,7 @@ export default function DesignsPage() {
           item={open}
           members={members}
           canEdit={canEdit}
-          isGestao={role === "gestao"}
+          isGestao={isAdmin}
           onClose={() => setOpen(null)}
           onSaved={refresh}
         />

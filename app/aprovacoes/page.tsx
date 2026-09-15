@@ -11,9 +11,9 @@ import { supabase } from "@/lib/supabase";
 
 export default function AprovacoesPage() {
   const { posts, steps, members, deliverables, loading, error, refresh } = useRetiroData();
-  const { role } = useRole();
+  const { role, isAdmin } = useRole();
   const [open, setOpen] = useState<EditorialPost | null>(null);
-  const isGestao = role === "gestao";
+  const isGestao = isAdmin;
 
   if (loading) return <p className="text-mist">Carregando aprovações…</p>;
   if (error) return <p className="text-clay">{error}</p>;
@@ -128,7 +128,6 @@ export default function AprovacoesPage() {
           post={open}
           steps={steps.filter((s) => s.post_id === open.id)}
           members={members}
-          role={role}
           onClose={() => setOpen(null)}
           onSaved={refresh}
         />

@@ -10,11 +10,20 @@ type AuthCtx = {
   loading: boolean;
   member: TeamMember | null;
   role: Role | null;
+  roles: Role[];
+  isAdmin: boolean;
+  hasRole: (...needed: Role[]) => boolean;
   login: (email: string, password: string) => Promise<void>;
   signOut: () => void;
 };
 
 const AuthContext = createContext<AuthCtx | null>(null);
+
+function rolesOf(member: TeamMember | null): Role[] {
+  if (!member) return [];
+  if (member.roles?.length) return member.roles;
+  return member.role ? [member.role] : [];
+}
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
@@ -46,15 +55,30 @@ export function Providers({ children }: { children: React.ReactNode }) {
     window.localStorage.removeItem(SESSION_KEY);
   }, []);
 
+  const roles = rolesOf(member);
+  const isAdmin = roles.includes("gestao");
+
+  const hasRole = useCallback(
+    (...needed: Role[]) => {
+      if (!needed.length) return false;
+      if (roles.includes("gestao")) return true;
+      return needed.some((role) => roles.includes(role));
+    },
+    [roles],
+  );
+
   const value = useMemo(
     () => ({
       loading,
       member,
       role: member?.role ?? null,
+      roles,
+      isAdmin,
+      hasRole,
       login,
       signOut,
     }),
-    [loading, member, login, signOut],
+    [loading, member, roles, isAdmin, hasRole, login, signOut],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
@@ -67,6 +91,6 @@ export function useAuth() {
 }
 
 export function useRole() {
-  const { role } = useAuth();
-  return { role };
+  const { role, hasRole, isAdmin } = useAuth();
+  return { role, hasRole, isAdmin };
 }

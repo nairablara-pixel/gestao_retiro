@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "./providers";
 import { ROLE_LABEL } from "@/lib/labels";
+import type { Role } from "@/lib/types";
 
 const NAV = [
   { href: "/", label: "Painel" },
@@ -15,7 +16,7 @@ const NAV = [
 
 export function Shell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { member, role, signOut, loading } = useAuth();
+  const { member, role, roles, isAdmin, signOut, loading } = useAuth();
 
   return (
     <div className="min-h-screen lg:grid lg:grid-cols-[260px_1fr]">
@@ -65,7 +66,12 @@ export function Shell({ children }: { children: React.ReactNode }) {
           ) : member && role ? (
             <div className="rounded-2xl bg-white/5 p-3">
               <p className="font-medium text-pearl">{member.name}</p>
-              <p className="text-[11px] text-foam/70">{ROLE_LABEL[role]}</p>
+              <p className="text-[11px] text-gold">
+                {isAdmin ? "Administradora" : ROLE_LABEL[role]}
+              </p>
+              <p className="mt-1 text-[11px] text-foam/70">
+                {roles.map((item: Role) => ROLE_LABEL[item]).join(" · ")}
+              </p>
               <p className="mt-1 truncate text-[11px] text-foam/50">{member.email}</p>
               <button
                 type="button"
@@ -92,7 +98,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
           {member && role ? (
             <>
               <p className="truncate text-sm">
-                {member.name} · {ROLE_LABEL[role]}
+                {member.name} · {isAdmin ? "Administradora" : ROLE_LABEL[role]}
               </p>
               <button type="button" className="text-sm text-aqua underline" onClick={() => void signOut()}>
                 Sair

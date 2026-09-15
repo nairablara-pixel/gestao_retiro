@@ -25,7 +25,7 @@ const STAGE_ORDER = [
 
 export default function CalendarioPage() {
   const { posts, steps, members, loading, error, refresh } = useRetiroData();
-  const { role } = useRole();
+  const { hasRole } = useRole();
   const [open, setOpen] = useState<EditorialPost | "new" | null>(null);
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("todos");
@@ -64,7 +64,7 @@ export default function CalendarioPage() {
             Editável pela equipe. Produção só depois do OK da gestão principal.
           </p>
         </div>
-        {(role === "gestao" || role === "marketing") && (
+        {hasRole("gestao", "marketing") && (
           <PrimaryButton onClick={() => setOpen("new")}>Nova publicação</PrimaryButton>
         )}
       </header>
@@ -156,7 +156,6 @@ export default function CalendarioPage() {
             open === "new" ? [] : steps.filter((s) => s.post_id === open.id)
           }
           members={members}
-          role={role}
           onClose={() => setOpen(null)}
           onSaved={refresh}
         />

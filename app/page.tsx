@@ -10,7 +10,7 @@ import { useState } from "react";
 
 export default function PainelPage() {
   const { settings, posts, deliverables, loading, error, refresh } = useRetiroData();
-  const { role } = useRole();
+  const { hasRole } = useRole();
   const [savingCount, setSavingCount] = useState(false);
 
   if (loading) return <p className="text-mist">Carregando o painel…</p>;
@@ -64,7 +64,7 @@ export default function PainelPage() {
           <p className="text-[11px] uppercase tracking-[0.16em] text-mist">Inscritas</p>
           <div className="mt-2 flex items-end gap-3">
             <p className="font-display text-4xl">{settings.inscription_count}</p>
-            {role === "gestao" || role === "marketing" ? (
+            {hasRole("gestao", "marketing") ? (
               <label className="text-xs text-mist">
                 atualizar
                 <input
