@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import type { EditorialPost, PostStatus, ProductionStep, TeamMember } from "@/lib/types";
+import type { EditorialPost, PostFile, PostStatus, ProductionStep, TeamMember } from "@/lib/types";
 import { useAuth } from "./providers";
 import {
   CHANNEL_LABEL,
@@ -44,9 +44,13 @@ export function PostDrawer({ post, steps, members, onClose, onSaved }: Props) {
   const { hasRole, isAdmin } = useAuth();
   const isNew = post === "new";
   const current = post && post !== "new" ? post : null;
+  const [createdId, setCreatedId] = useState<string | null>(current?.id ?? null);
   const [form, setForm] = useState(emptyPost);
   const [comment, setComment] = useState("");
   const [saving, setSaving] = useState(false);
+  const [files, setFiles] = useState<PostFile[]>(current?.files ?? []);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const canEdit = hasRole("gestao", "marketing", "design");
   const canSendApproval = canEdit;
   const isGestao = isAdmin;
@@ -70,8 +74,12 @@ export function PostDrawer({ post, steps, members, onClose, onSaved }: Props) {
         approval_comment: current.approval_comment ?? "",
       });
       setComment("");
+      setFiles(current.files ?? []);
+      setCreatedId(current.id);
     } else {
       setForm(emptyPost);
+      setFiles([]);
+      setCreatedId(null);
     }
   }, [current, isNew]);
 
@@ -84,6 +92,42 @@ export function PostDrawer({ post, steps, members, onClose, onSaved }: Props) {
 
   const set = (key: keyof typeof form, value: string) =>
     setForm((prev) => ({ ...prev, [key]: value }));
+
+  async function ensureSaved() {
+    if (createdId) return createdId;
+    const payload = {
+      publish_date: form.publish_date,
+      channel: form.channel,
+      format: form.format,
+      theme: form.theme || "Nova publicação",
+      content: form.content,
+      cta: form.cta || null,
+      campaign_stage: form.campaign_stage,
+      post_type: form.post_type,
+      assignee_id: form.assignee_id || null,
+      briefing: form.briefing || null,
+      copy_text: form.copy_text || null,
+      design_notes: form.design_notes || null,
+      status: "rascunho",
+      sort_order: 500,
+    };
+    const { data, error } = await supabase
+      .from("editorial_posts")
+      .insert(payload)
+      .select("id")
+      .single();
+    if (error || !data) throw new Error(error?.message || "Não foi possível criar a publicação.");
+    await supabase.from("production_steps").insert([
+      { post_id: data.id, step_key: "briefing", label: "Briefing", sort_order: 0 },
+      { post_id: data.id, step_key: "copy", label: "Texto / copy", sort_order: 1 },
+      { post_id: data.id, step_key: "design", label: "Design", sort_order: 2 },
+      { post_id: data.id, step_key: "revisao", label: "Revisão da equipe", sort_order: 3 },
+      { post_id: data.id, step_key: "aprovacao", label: "Aprovação da gestão", sort_order: 4 },
+      { post_id: data.id, step_key: "publicacao", label: "Publicação", sort_order: 5 },
+    ]);
+    setCreatedId(data.id);
+    return data.id as string;
+  }
 
   async function save(extra: Partial<EditorialPost> = {}) {
     setSaving(true);
@@ -103,28 +147,66 @@ export function PostDrawer({ post, steps, members, onClose, onSaved }: Props) {
       ...extra,
     };
 
-    if (isNew) {
-      const { data, error } = await supabase
-        .from("editorial_posts")
-        .insert({ ...payload, status: "rascunho", sort_order: 500 })
-        .select("id")
-        .single();
-      if (!error && data) {
-        await supabase.from("production_steps").insert([
-          { post_id: data.id, step_key: "briefing", label: "Briefing", sort_order: 0 },
-          { post_id: data.id, step_key: "copy", label: "Texto / copy", sort_order: 1 },
-          { post_id: data.id, step_key: "design", label: "Design", sort_order: 2 },
-          { post_id: data.id, step_key: "revisao", label: "Revisão da equipe", sort_order: 3 },
-          { post_id: data.id, step_key: "aprovacao", label: "Aprovação da gestão", sort_order: 4 },
-          { post_id: data.id, step_key: "publicacao", label: "Publicação", sort_order: 5 },
-        ]);
-      }
-    } else if (current) {
-      await supabase.from("editorial_posts").update(payload).eq("id", current.id);
+    const id = createdId ?? current?.id;
+    if (!id) {
+      const newId = await ensureSaved();
+      await supabase.from("editorial_posts").update(payload).eq("id", newId);
+    } else {
+      await supabase.from("editorial_posts").update(payload).eq("id", id);
     }
     setSaving(false);
     onSaved();
-    if (isNew) onClose();
+  }
+
+  async function onFiles(list: FileList | null) {
+    if (!list?.length || !canEdit) return;
+    setUploading(true);
+    setUploadError(null);
+    try {
+      const postId = await ensureSaved();
+      for (const file of Array.from(list)) {
+        const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
+        const path = `posts/${postId}/${Date.now()}-${Math.random().toString(16).slice(2)}.${ext}`;
+        const { error } = await supabase.storage.from("designs").upload(path, file, {
+          upsert: true,
+          contentType: file.type,
+        });
+        if (error) throw error;
+        const { data } = supabase.storage.from("designs").getPublicUrl(path);
+        const { data: row, error: insertError } = await supabase
+          .from("editorial_post_files")
+          .insert({
+            post_id: postId,
+            url: data.publicUrl,
+            storage_path: path,
+            file_name: file.name,
+          })
+          .select("*")
+          .single();
+        if (insertError) throw insertError;
+        if (row) setFiles((prev) => [...prev, row as PostFile]);
+      }
+      await supabase
+        .from("production_steps")
+        .update({ done: true, done_at: new Date().toISOString() })
+        .eq("post_id", postId)
+        .eq("step_key", "design");
+      onSaved();
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : "Falha no envio da arte.");
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  async function removeFile(file: PostFile) {
+    if (!canEdit) return;
+    await supabase.from("editorial_post_files").delete().eq("id", file.id);
+    if (file.storage_path) {
+      await supabase.storage.from("designs").remove([file.storage_path]);
+    }
+    setFiles((prev) => prev.filter((item) => item.id !== file.id));
+    onSaved();
   }
 
   async function toggleStep(step: ProductionStep) {
@@ -141,7 +223,7 @@ export function PostDrawer({ post, steps, members, onClose, onSaved }: Props) {
   }
 
   async function requestApproval() {
-    if (!current) return;
+    if (!(createdId ?? current?.id)) return;
     await save({
       status: "aguardando_aprovacao",
       approval_comment: comment || null,
@@ -334,7 +416,50 @@ export function PostDrawer({ post, steps, members, onClose, onSaved }: Props) {
             />
           </Field>
 
-          {!isNew && (
+          <div>
+            <p className="mb-2 text-[11px] uppercase tracking-[0.16em] text-mist">
+              Arte da publicação
+            </p>
+            {files.length > 0 && (
+              <div className="mb-3 grid grid-cols-2 gap-2">
+                {files.map((file) => (
+                  <div key={file.id} className="relative overflow-hidden rounded-2xl bg-white">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={file.url} alt={file.file_name ?? "Arte"} className="h-32 w-full object-cover" />
+                    {canEdit && (
+                      <button
+                        type="button"
+                        onClick={() => void removeFile(file)}
+                        className="absolute right-2 top-2 rounded-full bg-deep/80 px-2 py-0.5 text-[11px] text-white"
+                      >
+                        Remover
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+            <Field label="Adicionar arte">
+              <input
+                type="file"
+                multiple
+                accept="image/png,image/jpeg,image/webp,image/gif"
+                disabled={!canEdit}
+                className="block w-full text-sm"
+                onChange={(e) => {
+                  void onFiles(e.target.files);
+                  e.target.value = "";
+                }}
+              />
+              <p className="mt-1 text-xs text-mist">
+                Feed, stories ou carrossel. Pode enviar várias imagens.
+              </p>
+              {uploading && <p className="text-sm text-aqua">Enviando arte…</p>}
+              {uploadError && <p className="text-sm text-clay">{uploadError}</p>}
+            </Field>
+          </div>
+
+          {(createdId || current) && (
             <div className="rounded-2xl border border-black/5 bg-white p-4">
               <p className="mb-3 text-[11px] uppercase tracking-[0.16em] text-mist">
                 Etapas de produção

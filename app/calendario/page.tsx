@@ -117,7 +117,8 @@ export default function CalendarioPage() {
             <p className="text-sm text-mist">{STAGE_BLURB[group.stage]}</p>
           </div>
           <div className="overflow-hidden rounded-3xl bg-white shadow-card">
-            <div className="hidden grid-cols-[88px_110px_1fr_160px_120px] gap-3 border-b border-black/5 px-5 py-2 text-[11px] uppercase tracking-[0.14em] text-mist md:grid">
+            <div className="hidden grid-cols-[56px_88px_110px_1fr_160px_120px] gap-3 border-b border-black/5 px-5 py-2 text-[11px] uppercase tracking-[0.14em] text-mist md:grid">
+              <span>Arte</span>
               <span>Data</span>
               <span>Canal</span>
               <span>Tema</span>
@@ -129,8 +130,20 @@ export default function CalendarioPage() {
                 key={post.id}
                 type="button"
                 onClick={() => setOpen(post)}
-                className="grid w-full gap-1 border-b border-black/5 px-5 py-4 text-left last:border-0 hover:bg-foam/40 md:grid-cols-[88px_110px_1fr_160px_120px] md:items-center"
+                className="grid w-full gap-1 border-b border-black/5 px-5 py-4 text-left last:border-0 hover:bg-foam/40 md:grid-cols-[56px_88px_110px_1fr_160px_120px] md:items-center"
               >
+                {post.files?.[0] ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={post.files[0].url}
+                    alt=""
+                    className="h-12 w-12 rounded-xl object-cover"
+                  />
+                ) : (
+                  <span className="grid h-12 w-12 place-items-center rounded-xl bg-foam text-[10px] text-mist">
+                    arte
+                  </span>
+                )}
                 <span className="text-sm font-medium text-tide">
                   {formatDate(post.publish_date)}
                 </span>
@@ -151,7 +164,11 @@ export default function CalendarioPage() {
 
       {open && (
         <PostDrawer
-          post={open}
+          post={
+            open === "new"
+              ? "new"
+              : posts.find((item) => item.id === open.id) ?? open
+          }
           steps={
             open === "new" ? [] : steps.filter((s) => s.post_id === open.id)
           }

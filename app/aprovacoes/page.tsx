@@ -75,11 +75,22 @@ export default function AprovacoesPage() {
                 onClick={() => setOpen(post)}
                 className="flex w-full flex-wrap items-center justify-between gap-3 border-b border-black/5 px-5 py-4 text-left last:border-0 hover:bg-foam/40"
               >
-                <div>
-                  <p className="font-medium">{post.theme}</p>
-                  <p className="text-sm text-mist">
-                    {formatDate(post.publish_date)} · {CHANNEL_LABEL[post.channel]}
-                  </p>
+                <div className="flex items-center gap-3">
+                  {post.files?.[0] ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={post.files[0].url} alt="" className="h-14 w-14 rounded-xl object-cover" />
+                  ) : (
+                    <span className="grid h-14 w-14 place-items-center rounded-xl bg-foam text-[10px] text-mist">
+                      sem arte
+                    </span>
+                  )}
+                  <div>
+                    <p className="font-medium">{post.theme}</p>
+                    <p className="text-sm text-mist">
+                      {formatDate(post.publish_date)} · {CHANNEL_LABEL[post.channel]}
+                      {post.files?.length ? ` · ${post.files.length} arte(s)` : ""}
+                    </p>
+                  </div>
                 </div>
                 <StatusBadge status={post.status} />
               </button>

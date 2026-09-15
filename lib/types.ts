@@ -26,6 +26,14 @@ export type DeliverableFile = {
   file_name: string | null;
 };
 
+export type PostFile = {
+  id: string;
+  post_id: string;
+  url: string;
+  storage_path: string | null;
+  file_name: string | null;
+};
+
 export type TeamMember = {
   id: string;
   name: string;
@@ -72,6 +80,7 @@ export type EditorialPost = {
   approved_by: string | null;
   approved_at: string | null;
   sort_order: number;
+  files?: PostFile[];
 };
 
 export type ProductionStep = {

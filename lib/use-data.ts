@@ -7,6 +7,7 @@ import type {
   DeliverableFile,
   EditorialPost,
   EventSettings,
+  PostFile,
   ProductionStep,
   TeamMember,
 } from "./types";
@@ -22,7 +23,7 @@ export function useRetiroData() {
 
   const refresh = useCallback(async () => {
     setError(null);
-    const [s, m, p, st, d, f] = await Promise.all([
+    const [s, m, p, st, d, f, pf] = await Promise.all([
       supabase.from("event_settings").select("*").eq("id", 1).single(),
       supabase
         .from("team_members")
@@ -32,6 +33,7 @@ export function useRetiroData() {
       supabase.from("production_steps").select("*").order("sort_order"),
       supabase.from("deliverables").select("*").order("due_date"),
       supabase.from("deliverable_files").select("*").order("created_at"),
+      supabase.from("editorial_post_files").select("*").order("created_at"),
     ]);
 
     const firstError =
@@ -40,7 +42,8 @@ export function useRetiroData() {
       p.error?.message ||
       st.error?.message ||
       d.error?.message ||
-      f.error?.message;
+      f.error?.message ||
+      pf.error?.message;
     if (firstError) setError(firstError);
 
     if (s.data) setSettings(s.data as EventSettings);
@@ -59,7 +62,15 @@ export function useRetiroData() {
         })),
       );
     }
-    if (p.data) setPosts(p.data as EditorialPost[]);
+    if (p.data) {
+      const postFiles = (pf.data as PostFile[]) ?? [];
+      setPosts(
+        (p.data as EditorialPost[]).map((item) => ({
+          ...item,
+          files: postFiles.filter((file) => file.post_id === item.id),
+        })),
+      );
+    }
     if (st.data) setSteps(st.data as ProductionStep[]);
     if (d.data) {
       const files = (f.data as DeliverableFile[]) ?? [];
