@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { storeImage } from "@/lib/upload";
 import type { EditorialPost, PostFile, PostStatus, ProductionStep, TeamMember } from "@/lib/types";
 import { useAuth } from "./providers";
 import {
@@ -174,35 +175,30 @@ export function PostDrawer({ post, steps, members, onClose, onSaved }: Props) {
   }
 
   async function onFiles(list: FileList | null) {
-    if (!list?.length || !canEdit) return;
+    if (!list?.length) return;
+    if (!canEdit) {
+      setUploadError("Entre com o e-mail da equipe para enviar a arte.");
+      return;
+    }
     setUploading(true);
     setUploadError(null);
     try {
-      const postId = await ensureSaved();
+      const id = await ensureSaved();
       for (const file of Array.from(list)) {
-        const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
-        const path = `posts/${postId}/${Date.now()}-${Math.random().toString(16).slice(2)}.${ext}`;
-        const { error } = await supabase.storage.from("designs").upload(path, file, {
-          upsert: true,
-          contentType: file.type,
+        const stored = await storeImage(`posts/${id}`, file);
+        const { error: insertError } = await supabase.from("editorial_post_files").insert({
+          post_id: id,
+          url: stored.url,
+          storage_path: stored.storage_path,
+          file_name: stored.file_name,
         });
-        if (error) throw error;
-        const { data } = supabase.storage.from("designs").getPublicUrl(path);
-        const { error: insertError } = await supabase
-          .from("editorial_post_files")
-          .insert({
-            post_id: postId,
-            url: data.publicUrl,
-            storage_path: path,
-            file_name: file.name,
-          });
-        if (insertError) throw insertError;
+        if (insertError) throw new Error(insertError.message);
       }
-      await loadFiles(postId);
+      await loadFiles(id);
       await supabase
         .from("production_steps")
         .update({ done: true, done_at: new Date().toISOString() })
-        .eq("post_id", postId)
+        .eq("post_id", id)
         .eq("step_key", "design");
       onSaved();
     } catch (err) {
@@ -351,18 +347,21 @@ export function PostDrawer({ post, steps, members, onClose, onSaved }: Props) {
                 type="file"
                 multiple
                 accept="image/*"
-                disabled={!canEdit}
+                disabled={!canEdit || uploading}
                 className="block w-full text-sm"
                 onChange={(e) => {
                   void onFiles(e.target.files);
-                  e.target.value = "";
                 }}
               />
               <p className="mt-1 text-xs text-mist">
                 Clique na imagem para abrir em tamanho grande. Pode enviar várias.
               </p>
-              {uploading && <p className="text-sm text-aqua">Enviando arte…</p>}
-              {uploadError && <p className="text-sm text-clay">{uploadError}</p>}
+              {uploading && <p className="text-sm text-aqua">Salvando arte… aguarde.</p>}
+              {uploadError && (
+                <p className="mt-2 rounded-xl bg-[#f8e4e2] px-3 py-2 text-sm text-clay">
+                  {uploadError}
+                </p>
+              )}
             </Field>
           </div>
 

@@ -12,6 +12,7 @@ import {
 } from "@/lib/labels";
 import type { Deliverable, DeliverableFile, DeliverableStatus } from "@/lib/types";
 import { supabase } from "@/lib/supabase";
+import { storeImage } from "@/lib/upload";
 
 function coverOf(item: Deliverable) {
   return item.files?.[0]?.url || item.preview_url;
@@ -156,8 +157,17 @@ function DesignDrawer({
   const [uploadError, setUploadError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (current) setFiles(current.files ?? []);
-  }, [current]);
+    if (!current?.id) return;
+    void supabase
+      .from("deliverable_files")
+      .select("*")
+      .eq("deliverable_id", current.id)
+      .order("created_at")
+      .then(({ data, error }) => {
+        if (error) setUploadError(error.message);
+        else setFiles((data as DeliverableFile[]) ?? []);
+      });
+  }, [current?.id]);
 
   async function ensureSaved() {
     if (createdId) return createdId;
@@ -203,31 +213,29 @@ function DesignDrawer({
   }
 
   async function onFiles(list: FileList | null) {
-    if (!list?.length || !canEdit) return;
+    if (!list?.length) return;
+    if (!canEdit) {
+      setUploadError("Entre com o e-mail da equipe para enviar arquivos.");
+      return;
+    }
     setUploading(true);
     setUploadError(null);
     try {
       const deliverableId = await ensureSaved();
-      for (const file of Array.from(list)) {
-        const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
-        const path = `${deliverableId}/${Date.now()}-${Math.random().toString(16).slice(2)}.${ext}`;
-        const { error } = await supabase.storage.from("designs").upload(path, file, {
-          upsert: true,
-          contentType: file.type,
-        });
-        if (error) throw error;
-        const { data } = supabase.storage.from("designs").getPublicUrl(path);
+      const picked = Array.from(list);
+      for (const file of picked) {
+        const stored = await storeImage(`designs/${deliverableId}`, file);
         const { data: row, error: insertError } = await supabase
           .from("deliverable_files")
           .insert({
             deliverable_id: deliverableId,
-            url: data.publicUrl,
-            storage_path: path,
-            file_name: file.name,
+            url: stored.url,
+            storage_path: stored.storage_path,
+            file_name: stored.file_name,
           })
           .select("*")
           .single();
-        if (insertError) throw insertError;
+        if (insertError) throw new Error(insertError.message);
         if (row) setFiles((prev) => [...prev, row as DeliverableFile]);
       }
       const { data: uploaded } = await supabase
@@ -329,19 +337,23 @@ function DesignDrawer({
             <input
               type="file"
               multiple
-              accept="image/png,image/jpeg,image/webp,image/gif"
-              disabled={!canEdit}
+              accept="image/*"
+              disabled={!canEdit || uploading}
               className="block w-full text-sm"
               onChange={(e) => {
-                void onFiles(e.target.files);
-                e.target.value = "";
+                const selected = e.target.files;
+                void onFiles(selected);
               }}
             />
             <p className="mt-1 text-xs text-mist">
-              Pode enviar várias imagens de uma vez. PNG, JPG ou WEBP até 10 MB cada.
+              Selecione uma ou várias imagens. Elas aparecem aqui assim que salvam.
             </p>
-            {uploading && <p className="text-sm text-aqua">Enviando arquivos…</p>}
-            {uploadError && <p className="text-sm text-clay">{uploadError}</p>}
+            {uploading && <p className="text-sm text-aqua">Salvando arquivos… aguarde.</p>}
+            {uploadError && (
+              <p className="mt-2 rounded-xl bg-[#f8e4e2] px-3 py-2 text-sm text-clay">
+                {uploadError}
+              </p>
+            )}
           </Field>
         </div>
 
