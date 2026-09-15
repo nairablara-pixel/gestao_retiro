@@ -22,7 +22,9 @@ export default function PainelPage() {
   const next = posts
     .filter((p) => p.post_type === "regular" && p.status !== "publicado")
     .slice(0, 5);
-  const pecasPendentes = deliverables.filter((d) => d.status !== "concluido");
+  const pecasPendentes = deliverables.filter(
+    (d) => d.status !== "concluido" && d.status !== "postado",
+  );
 
   async function updateCount(value: number) {
     setSavingCount(true);

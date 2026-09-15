@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/components/providers";
 import { Field, GhostButton, PrimaryButton, inputClass } from "@/components/ui";
@@ -10,17 +10,12 @@ import {
   DELIVERABLE_STATUS_LABEL,
   formatDate,
 } from "@/lib/labels";
-import type { Deliverable, DeliverableStatus } from "@/lib/types";
+import type { Deliverable, DeliverableFile, DeliverableStatus } from "@/lib/types";
 import { supabase } from "@/lib/supabase";
 
-const STATUSES: DeliverableStatus[] = [
-  "nao_iniciado",
-  "briefing",
-  "producao",
-  "aguardando_aprovacao",
-  "aprovado",
-  "concluido",
-];
+function coverOf(item: Deliverable) {
+  return item.files?.[0]?.url || item.preview_url;
+}
 
 export default function DesignsPage() {
   const { deliverables, members, loading, error, refresh } = useRetiroData();
@@ -48,8 +43,8 @@ export default function DesignsPage() {
           </p>
           <h1 className="font-display text-4xl">Designs</h1>
           <p className="mt-2 max-w-xl text-mist">
-            Envie a arte (telão, flyer, caderneta, lembrancinha, feed…) para a
-            gestão ver a prévia e dar o OK antes da produção.
+            Envie quantos arquivos quiser. A gestão vê todas as prévias, dá o OK
+            e depois a equipe marca como postado.
           </p>
         </div>
         {canEdit && <PrimaryButton onClick={() => setOpen("new")}>Novo design</PrimaryButton>}
@@ -71,47 +66,51 @@ export default function DesignsPage() {
             {CATEGORY_LABEL[category] ?? category}
           </h2>
           <div className="grid gap-3 md:grid-cols-2">
-            {items.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => setOpen(item)}
-                className="overflow-hidden rounded-3xl bg-white text-left shadow-card hover:ring-2 hover:ring-gold/40"
-              >
-                {item.preview_url ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={item.preview_url}
-                    alt={`Prévia de ${item.title}`}
-                    className="h-44 w-full object-cover"
-                  />
-                ) : (
-                  <div className="grid h-32 place-items-center bg-foam text-sm text-mist">
-                    Sem prévia visual
+            {items.map((item) => {
+              const cover = coverOf(item);
+              const count = item.files?.length ?? 0;
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => setOpen(item)}
+                  className="overflow-hidden rounded-3xl bg-white text-left shadow-card hover:ring-2 hover:ring-gold/40"
+                >
+                  {cover ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={cover}
+                      alt={`Prévia de ${item.title}`}
+                      className="h-44 w-full object-cover"
+                    />
+                  ) : (
+                    <div className="grid h-32 place-items-center bg-foam text-sm text-mist">
+                      Sem prévia visual
+                    </div>
+                  )}
+                  <div className="p-5">
+                    <div className="flex items-start justify-between gap-3">
+                      <h3 className="font-medium">{item.title}</h3>
+                      <span className="rounded-full bg-foam px-2.5 py-0.5 text-[11px] text-tide">
+                        {DELIVERABLE_STATUS_LABEL[item.status]}
+                      </span>
+                    </div>
+                    <p className="mt-2 text-sm text-mist">{item.description}</p>
+                    <p className="mt-3 text-xs text-mist">
+                      {count} {count === 1 ? "arquivo" : "arquivos"}
+                      {item.due_date ? ` · prazo ${formatDate(item.due_date)}` : ""}
+                    </p>
                   </div>
-                )}
-                <div className="p-5">
-                  <div className="flex items-start justify-between gap-3">
-                    <h3 className="font-medium">{item.title}</h3>
-                    <span className="rounded-full bg-foam px-2.5 py-0.5 text-[11px] text-tide">
-                      {DELIVERABLE_STATUS_LABEL[item.status]}
-                    </span>
-                  </div>
-                  <p className="mt-2 text-sm text-mist">{item.description}</p>
-                  <p className="mt-3 text-xs text-mist">
-                    {item.due_date ? `Prazo ${formatDate(item.due_date)}` : "Sem prazo"}
-                    {item.quantity ? ` · ${item.quantity}` : ""}
-                  </p>
-                </div>
-              </button>
-            ))}
+                </button>
+              );
+            })}
           </div>
         </section>
       ))}
 
       {open && (
         <DesignDrawer
-          item={open}
+          item={open === "new" ? "new" : deliverables.find((d) => d.id === open.id) ?? open}
           members={members}
           canEdit={canEdit}
           isGestao={isAdmin}
@@ -140,6 +139,7 @@ function DesignDrawer({
 }) {
   const isNew = item === "new";
   const current = isNew ? null : item;
+  const [createdId, setCreatedId] = useState<string | null>(current?.id ?? null);
   const [form, setForm] = useState({
     title: current?.title ?? "",
     category: current?.category ?? "digital",
@@ -149,13 +149,39 @@ function DesignDrawer({
     due_date: current?.due_date ?? "",
     quantity: current?.quantity ?? "",
     notes: current?.notes ?? "",
-    preview_url: current?.preview_url ?? "",
   });
+  const [files, setFiles] = useState<DeliverableFile[]>(current?.files ?? []);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
 
-  async function save(status = form.status, preview = form.preview_url) {
+  useEffect(() => {
+    if (current) setFiles(current.files ?? []);
+  }, [current]);
+
+  async function ensureSaved() {
+    if (createdId) return createdId;
+    const payload = {
+      title: form.title || "Novo design",
+      category: form.category,
+      description: form.description || null,
+      status: form.status,
+      assignee_id: form.assignee_id || null,
+      due_date: form.due_date || null,
+      quantity: form.quantity || null,
+      notes: form.notes || null,
+    };
+    const { data, error } = await supabase
+      .from("deliverables")
+      .insert(payload)
+      .select("id")
+      .single();
+    if (error || !data) throw new Error(error?.message || "Não foi possível criar o design.");
+    setCreatedId(data.id);
+    return data.id as string;
+  }
+
+  async function save(status = form.status) {
     setSaving(true);
     const payload = {
       title: form.title,
@@ -166,43 +192,90 @@ function DesignDrawer({
       due_date: form.due_date || null,
       quantity: form.quantity || null,
       notes: form.notes || null,
-      preview_url: preview || null,
+      preview_url: files[0]?.url || current?.preview_url || null,
     };
-    if (isNew) await supabase.from("deliverables").insert(payload);
-    else await supabase.from("deliverables").update(payload).eq("id", current!.id);
+    const id = createdId ?? current?.id;
+    if (!id) await supabase.from("deliverables").insert(payload);
+    else await supabase.from("deliverables").update(payload).eq("id", id);
     setSaving(false);
     onSaved();
     onClose();
   }
 
-  async function onFile(file: File | undefined) {
-    if (!file || !canEdit) return;
-    if (!current) {
-      setUploadError("Salve o design primeiro, depois envie a prévia.");
-      return;
-    }
+  async function onFiles(list: FileList | null) {
+    if (!list?.length || !canEdit) return;
     setUploading(true);
     setUploadError(null);
-    const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
-    const path = `${current.id}/${Date.now()}.${ext}`;
-    const { error } = await supabase.storage.from("designs").upload(path, file, {
-      upsert: true,
-      contentType: file.type,
-    });
-    if (error) {
+    try {
+      const deliverableId = await ensureSaved();
+      for (const file of Array.from(list)) {
+        const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
+        const path = `${deliverableId}/${Date.now()}-${Math.random().toString(16).slice(2)}.${ext}`;
+        const { error } = await supabase.storage.from("designs").upload(path, file, {
+          upsert: true,
+          contentType: file.type,
+        });
+        if (error) throw error;
+        const { data } = supabase.storage.from("designs").getPublicUrl(path);
+        const { data: row, error: insertError } = await supabase
+          .from("deliverable_files")
+          .insert({
+            deliverable_id: deliverableId,
+            url: data.publicUrl,
+            storage_path: path,
+            file_name: file.name,
+          })
+          .select("*")
+          .single();
+        if (insertError) throw insertError;
+        if (row) setFiles((prev) => [...prev, row as DeliverableFile]);
+      }
+      const { data: uploaded } = await supabase
+        .from("deliverable_files")
+        .select("url")
+        .eq("deliverable_id", deliverableId)
+        .order("created_at")
+        .limit(1)
+        .maybeSingle();
+      await supabase
+        .from("deliverables")
+        .update({ preview_url: uploaded?.url || null })
+        .eq("id", deliverableId);
+      onSaved();
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : "Falha no envio.");
+    } finally {
       setUploading(false);
-      setUploadError(error.message);
-      return;
     }
-    const { data } = supabase.storage.from("designs").getPublicUrl(path);
-    setForm((prev) => ({ ...prev, preview_url: data.publicUrl }));
-    await supabase
-      .from("deliverables")
-      .update({ preview_url: data.publicUrl })
-      .eq("id", current.id);
-    setUploading(false);
+  }
+
+  async function removeFile(file: DeliverableFile) {
+    if (!canEdit) return;
+    await supabase.from("deliverable_files").delete().eq("id", file.id);
+    if (file.storage_path) {
+      await supabase.storage.from("designs").remove([file.storage_path]);
+    }
+    const next = files.filter((item) => item.id !== file.id);
+    setFiles(next);
+    if (current) {
+      await supabase
+        .from("deliverables")
+        .update({ preview_url: next[0]?.url || null })
+        .eq("id", current.id);
+    }
     onSaved();
   }
+
+  const hasFiles = files.length > 0;
+  const flow = [
+    { label: "Arquivos enviados", done: hasFiles },
+    {
+      label: "Enviado para OK da gestão",
+      done: ["aguardando_aprovacao", "aprovado", "postado"].includes(form.status),
+    },
+    { label: "Aprovado", done: form.status === "aprovado" || form.status === "postado" },
+    { label: "Postado", done: form.status === "postado" },
+  ];
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-deep/40">
@@ -213,25 +286,64 @@ function DesignDrawer({
           <GhostButton onClick={onClose}>Fechar</GhostButton>
         </div>
 
-        {form.preview_url && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={form.preview_url} alt="Prévia" className="max-h-64 w-full rounded-2xl object-contain bg-white" />
-        )}
+        <div className="rounded-2xl bg-white p-4">
+          <p className="mb-3 text-[11px] uppercase tracking-[0.16em] text-mist">Fluxo</p>
+          <ol className="space-y-2">
+            {flow.map((step) => (
+              <li key={step.label} className="flex items-center gap-3 text-sm">
+                <span
+                  className={`grid h-5 w-5 place-items-center rounded-full border text-[10px] ${
+                    step.done ? "border-aqua bg-aqua text-white" : "border-mist/40 text-transparent"
+                  }`}
+                >
+                  ✓
+                </span>
+                <span className={step.done ? "text-mist" : ""}>{step.label}</span>
+              </li>
+            ))}
+          </ol>
+        </div>
 
-        <Field label="Prévia visual">
-          <input
-            type="file"
-            accept="image/png,image/jpeg,image/webp,image/gif"
-            disabled={!canEdit}
-            className="block w-full text-sm"
-            onChange={(e) => void onFile(e.target.files?.[0])}
-          />
-          <p className="mt-1 text-xs text-mist">
-            PNG, JPG ou WEBP até 10 MB. A gestão vê esta imagem na aprovação.
+        <div>
+          <p className="mb-2 text-[11px] uppercase tracking-[0.16em] text-mist">
+            Arquivos para aprovação
           </p>
-          {uploading && <p className="text-sm text-aqua">Enviando prévia…</p>}
-          {uploadError && <p className="text-sm text-clay">{uploadError}</p>}
-        </Field>
+          <div className="grid grid-cols-2 gap-2">
+            {files.map((file) => (
+              <div key={file.id} className="relative overflow-hidden rounded-2xl bg-white">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={file.url} alt={file.file_name ?? "Prévia"} className="h-32 w-full object-cover" />
+                {canEdit && (
+                  <button
+                    type="button"
+                    onClick={() => void removeFile(file)}
+                    className="absolute right-2 top-2 rounded-full bg-deep/80 px-2 py-0.5 text-[11px] text-white"
+                  >
+                    Remover
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+          <Field label="Adicionar arquivos">
+            <input
+              type="file"
+              multiple
+              accept="image/png,image/jpeg,image/webp,image/gif"
+              disabled={!canEdit}
+              className="block w-full text-sm"
+              onChange={(e) => {
+                void onFiles(e.target.files);
+                e.target.value = "";
+              }}
+            />
+            <p className="mt-1 text-xs text-mist">
+              Pode enviar várias imagens de uma vez. PNG, JPG ou WEBP até 10 MB cada.
+            </p>
+            {uploading && <p className="text-sm text-aqua">Enviando arquivos…</p>}
+            {uploadError && <p className="text-sm text-clay">{uploadError}</p>}
+          </Field>
+        </div>
 
         <Field label="Título">
           <input className={inputClass} value={form.title} disabled={!canEdit} onChange={(e) => setForm({ ...form, title: e.target.value })} />
@@ -245,13 +357,6 @@ function DesignDrawer({
         </Field>
         <Field label="Descrição">
           <textarea className={inputClass} rows={3} value={form.description} disabled={!canEdit} onChange={(e) => setForm({ ...form, description: e.target.value })} />
-        </Field>
-        <Field label="Status">
-          <select className={inputClass} value={form.status} disabled={!canEdit} onChange={(e) => setForm({ ...form, status: e.target.value as DeliverableStatus })}>
-            {STATUSES.map((s) => (
-              <option key={s} value={s}>{DELIVERABLE_STATUS_LABEL[s]}</option>
-            ))}
-          </select>
         </Field>
         <Field label="Responsável">
           <select className={inputClass} value={form.assignee_id} disabled={!canEdit} onChange={(e) => setForm({ ...form, assignee_id: e.target.value })}>
@@ -276,11 +381,20 @@ function DesignDrawer({
           <PrimaryButton disabled={!canEdit || saving} onClick={() => save()}>
             Salvar
           </PrimaryButton>
-          {canEdit && !isNew && form.status !== "aguardando_aprovacao" && form.status !== "concluido" && (
+          {canEdit && (createdId || current) && !["aguardando_aprovacao", "aprovado", "postado"].includes(form.status) && (
             <GhostButton onClick={() => save("aguardando_aprovacao")}>Pedir OK da gestão</GhostButton>
           )}
           {isGestao && form.status === "aguardando_aprovacao" && (
-            <PrimaryButton onClick={() => save("aprovado")}>Aprovar design</PrimaryButton>
+            <>
+              <PrimaryButton onClick={() => save("aprovado")}>Aprovar design</PrimaryButton>
+              <GhostButton onClick={() => save("producao")}>Pedir alteração</GhostButton>
+            </>
+          )}
+          {canEdit && form.status === "aprovado" && (
+            <PrimaryButton onClick={() => save("postado")}>Marcar como postado</PrimaryButton>
+          )}
+          {canEdit && form.status === "postado" && (
+            <GhostButton onClick={() => save("aprovado")}>Desmarcar postado</GhostButton>
           )}
         </div>
       </aside>

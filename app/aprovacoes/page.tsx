@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { PostDrawer } from "@/components/post-drawer";
-import { useRole } from "@/components/providers";
+import { useAuth } from "@/components/providers";
 import { StatusBadge } from "@/components/ui";
 import { useRetiroData } from "@/lib/use-data";
 import { CHANNEL_LABEL, DELIVERABLE_STATUS_LABEL, formatDate } from "@/lib/labels";
@@ -11,7 +11,7 @@ import { supabase } from "@/lib/supabase";
 
 export default function AprovacoesPage() {
   const { posts, steps, members, deliverables, loading, error, refresh } = useRetiroData();
-  const { role, isAdmin } = useRole();
+  const { role, isAdmin, hasRole } = useAuth();
   const [open, setOpen] = useState<EditorialPost | null>(null);
   const isGestao = isAdmin;
 
@@ -29,6 +29,14 @@ export default function AprovacoesPage() {
     refresh();
   }
 
+  async function markPosted(id: string) {
+    if (!hasRole("gestao", "marketing", "design")) return;
+    await supabase.from("deliverables").update({ status: "postado" }).eq("id", id);
+    refresh();
+  }
+
+  const approvedQueue = deliverables.filter((d) => d.status === "aprovado");
+
   return (
     <div className="space-y-8">
       <header>
@@ -37,8 +45,7 @@ export default function AprovacoesPage() {
         </p>
         <h1 className="font-display text-4xl">Aprovações</h1>
         <p className="mt-2 max-w-xl text-mist">
-          Nada vai para produção sem este OK — postagens, telão, lembrancinhas,
-          press kit, cadernetas e flyers.
+          Veja todos os arquivos, dê o OK e depois marque como postado.
         </p>
         {!role && (
           <p className="mt-3 rounded-xl bg-[#f7ead0] px-4 py-2 text-sm text-[#7a5a12]">
@@ -82,7 +89,7 @@ export default function AprovacoesPage() {
       </section>
 
       <section>
-        <h2 className="font-display mb-3 text-2xl">Designs</h2>
+        <h2 className="font-display mb-3 text-2xl">Designs aguardando OK</h2>
         {pecaQueue.length === 0 ? (
           <p className="rounded-3xl bg-white p-6 text-mist shadow-card">
             Nenhum design esperando OK agora.
@@ -90,33 +97,64 @@ export default function AprovacoesPage() {
         ) : (
           <div className="grid gap-3">
             {pecaQueue.map((item) => (
-              <article key={item.id} className="flex flex-wrap items-center justify-between gap-3 rounded-3xl bg-white p-5 shadow-card">
-                <div className="flex items-center gap-4">
-                  {item.preview_url ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={item.preview_url} alt="" className="h-16 w-16 rounded-xl object-cover" />
-                  ) : (
-                    <div className="grid h-16 w-16 place-items-center rounded-xl bg-foam text-[10px] text-mist">
-                      Sem prévia
-                    </div>
-                  )}
+              <article key={item.id} className="rounded-3xl bg-white p-5 shadow-card">
+                <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <p className="font-medium">{item.title}</p>
                     <p className="text-sm text-mist">{item.description}</p>
                   </div>
-                </div>
-                <div className="flex items-center gap-3">
                   <span className="text-sm text-mist">{DELIVERABLE_STATUS_LABEL[item.status]}</span>
-                  {isGestao && (
-                    <button
-                      type="button"
-                      onClick={() => approvePeca(item.id)}
-                      className="rounded-full bg-tide px-4 py-2 text-sm text-white"
-                    >
-                      Aprovar
-                    </button>
-                  )}
                 </div>
+                {item.files && item.files.length > 0 && (
+                  <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-4">
+                    {item.files.map((file) => (
+                      <a key={file.id} href={file.url} target="_blank" rel="noreferrer">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={file.url} alt={file.file_name ?? ""} className="h-24 w-full rounded-xl object-cover" />
+                      </a>
+                    ))}
+                  </div>
+                )}
+                {isGestao && (
+                  <button
+                    type="button"
+                    onClick={() => approvePeca(item.id)}
+                    className="mt-4 rounded-full bg-tide px-4 py-2 text-sm text-white"
+                  >
+                    Aprovar todos os arquivos
+                  </button>
+                )}
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section>
+        <h2 className="font-display mb-3 text-2xl">Aprovados — marcar postado</h2>
+        {approvedQueue.length === 0 ? (
+          <p className="rounded-3xl bg-white p-6 text-mist shadow-card">
+            Nenhum design aprovado esperando publicação.
+          </p>
+        ) : (
+          <div className="grid gap-3">
+            {approvedQueue.map((item) => (
+              <article key={item.id} className="flex flex-wrap items-center justify-between gap-3 rounded-3xl bg-white p-5 shadow-card">
+                <div>
+                  <p className="font-medium">{item.title}</p>
+                  <p className="text-sm text-mist">
+                    {item.files?.length ?? 0} arquivo(s) aprovados
+                  </p>
+                </div>
+                {hasRole("gestao", "marketing", "design") && (
+                  <button
+                    type="button"
+                    onClick={() => markPosted(item.id)}
+                    className="rounded-full bg-tide px-4 py-2 text-sm text-white"
+                  >
+                    Marcar como postado
+                  </button>
+                )}
               </article>
             ))}
           </div>

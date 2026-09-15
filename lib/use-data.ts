@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { supabase } from "./supabase";
 import type {
   Deliverable,
+  DeliverableFile,
   EditorialPost,
   EventSettings,
   ProductionStep,
@@ -21,7 +22,7 @@ export function useRetiroData() {
 
   const refresh = useCallback(async () => {
     setError(null);
-    const [s, m, p, st, d] = await Promise.all([
+    const [s, m, p, st, d, f] = await Promise.all([
       supabase.from("event_settings").select("*").eq("id", 1).single(),
       supabase
         .from("team_members")
@@ -30,6 +31,7 @@ export function useRetiroData() {
       supabase.from("editorial_posts").select("*").order("sort_order"),
       supabase.from("production_steps").select("*").order("sort_order"),
       supabase.from("deliverables").select("*").order("due_date"),
+      supabase.from("deliverable_files").select("*").order("created_at"),
     ]);
 
     const firstError =
@@ -37,7 +39,8 @@ export function useRetiroData() {
       m.error?.message ||
       p.error?.message ||
       st.error?.message ||
-      d.error?.message;
+      d.error?.message ||
+      f.error?.message;
     if (firstError) setError(firstError);
 
     if (s.data) setSettings(s.data as EventSettings);
@@ -58,7 +61,15 @@ export function useRetiroData() {
     }
     if (p.data) setPosts(p.data as EditorialPost[]);
     if (st.data) setSteps(st.data as ProductionStep[]);
-    if (d.data) setDeliverables(d.data as Deliverable[]);
+    if (d.data) {
+      const files = (f.data as DeliverableFile[]) ?? [];
+      setDeliverables(
+        (d.data as Deliverable[]).map((item) => ({
+          ...item,
+          files: files.filter((file) => file.deliverable_id === item.id),
+        })),
+      );
+    }
     setLoading(false);
   }, []);
 

@@ -15,7 +15,16 @@ export type DeliverableStatus =
   | "producao"
   | "aguardando_aprovacao"
   | "aprovado"
+  | "postado"
   | "concluido";
+
+export type DeliverableFile = {
+  id: string;
+  deliverable_id: string;
+  url: string;
+  storage_path: string | null;
+  file_name: string | null;
+};
 
 export type TeamMember = {
   id: string;
@@ -41,6 +50,7 @@ export type Deliverable = {
   quantity: string | null;
   notes: string | null;
   preview_url: string | null;
+  files?: DeliverableFile[];
 };
 
 export type EditorialPost = {

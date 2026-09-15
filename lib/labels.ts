@@ -36,6 +36,7 @@ export const DELIVERABLE_STATUS_LABEL: Record<DeliverableStatus, string> = {
   producao: "Em produção",
   aguardando_aprovacao: "Aguardando OK",
   aprovado: "Aprovado",
+  postado: "Postado",
   concluido: "Concluído",
 };
 
