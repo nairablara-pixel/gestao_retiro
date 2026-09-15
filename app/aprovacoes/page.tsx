@@ -90,6 +90,7 @@ export default function AprovacoesPage() {
                       {formatDate(post.publish_date)} · {CHANNEL_LABEL[post.channel]}
                       {post.files?.length ? ` · ${post.files.length} arte(s)` : ""}
                     </p>
+                    <p className="mt-1 text-sm text-aqua">Clique para ver a arte e aprovar</p>
                   </div>
                 </div>
                 <StatusBadge status={post.status} />
@@ -174,7 +175,7 @@ export default function AprovacoesPage() {
 
       {open && (
         <PostDrawer
-          post={open}
+          post={posts.find((item) => item.id === open.id) ?? open}
           steps={steps.filter((s) => s.post_id === open.id)}
           members={members}
           onClose={() => setOpen(null)}

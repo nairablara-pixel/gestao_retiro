@@ -51,9 +51,24 @@ export function PostDrawer({ post, steps, members, onClose, onSaved }: Props) {
   const [files, setFiles] = useState<PostFile[]>(current?.files ?? []);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [viewer, setViewer] = useState<PostFile | null>(null);
   const canEdit = hasRole("gestao", "marketing", "design");
   const canSendApproval = canEdit;
   const isGestao = isAdmin;
+  const postId = createdId ?? current?.id ?? null;
+
+  async function loadFiles(id: string) {
+    const { data, error } = await supabase
+      .from("editorial_post_files")
+      .select("*")
+      .eq("post_id", id)
+      .order("created_at");
+    if (error) {
+      setUploadError(error.message);
+      return;
+    }
+    setFiles((data as PostFile[]) ?? []);
+  }
 
   useEffect(() => {
     if (current) {
@@ -74,14 +89,14 @@ export function PostDrawer({ post, steps, members, onClose, onSaved }: Props) {
         approval_comment: current.approval_comment ?? "",
       });
       setComment("");
-      setFiles(current.files ?? []);
       setCreatedId(current.id);
+      void loadFiles(current.id);
     } else {
       setForm(emptyPost);
       setFiles([]);
       setCreatedId(null);
     }
-  }, [current, isNew]);
+  }, [current?.id, isNew]);
 
   const orderedSteps = useMemo(
     () => [...steps].sort((a, b) => a.sort_order - b.sort_order),
@@ -173,19 +188,17 @@ export function PostDrawer({ post, steps, members, onClose, onSaved }: Props) {
         });
         if (error) throw error;
         const { data } = supabase.storage.from("designs").getPublicUrl(path);
-        const { data: row, error: insertError } = await supabase
+        const { error: insertError } = await supabase
           .from("editorial_post_files")
           .insert({
             post_id: postId,
             url: data.publicUrl,
             storage_path: path,
             file_name: file.name,
-          })
-          .select("*")
-          .single();
+          });
         if (insertError) throw insertError;
-        if (row) setFiles((prev) => [...prev, row as PostFile]);
       }
+      await loadFiles(postId);
       await supabase
         .from("production_steps")
         .update({ done: true, done_at: new Date().toISOString() })
@@ -231,11 +244,11 @@ export function PostDrawer({ post, steps, members, onClose, onSaved }: Props) {
   }
 
   async function approve() {
-    if (!current || !isGestao) return;
+    if (!postId || !isGestao) return;
     await supabase
       .from("production_steps")
       .update({ done: true, done_at: new Date().toISOString() })
-      .eq("post_id", current.id)
+      .eq("post_id", postId)
       .eq("step_key", "aprovacao");
     await save({
       status: "aprovado",
@@ -300,6 +313,59 @@ export function PostDrawer({ post, steps, members, onClose, onSaved }: Props) {
         </div>
 
         <div className="space-y-4 px-5 py-5">
+          <div className="rounded-2xl border border-black/5 bg-white p-4">
+            <p className="mb-2 text-[11px] uppercase tracking-[0.16em] text-mist">
+              Arte da publicação
+            </p>
+            {files.length > 0 ? (
+              <div className="mb-3 grid grid-cols-2 gap-2">
+                {files.map((file) => (
+                  <div key={file.id} className="relative overflow-hidden rounded-2xl bg-foam">
+                    <button
+                      type="button"
+                      className="block w-full"
+                      onClick={() => setViewer(file)}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={file.url} alt={file.file_name ?? "Arte"} className="h-36 w-full object-cover" />
+                    </button>
+                    {canEdit && (
+                      <button
+                        type="button"
+                        onClick={() => void removeFile(file)}
+                        className="absolute right-2 top-2 rounded-full bg-deep/80 px-2 py-0.5 text-[11px] text-white"
+                      >
+                        Remover
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="mb-3 rounded-xl bg-foam px-3 py-4 text-center text-sm text-mist">
+                Nenhuma arte enviada ainda. A gestão precisa ver a imagem para aprovar.
+              </p>
+            )}
+            <Field label="Adicionar arte">
+              <input
+                type="file"
+                multiple
+                accept="image/*"
+                disabled={!canEdit}
+                className="block w-full text-sm"
+                onChange={(e) => {
+                  void onFiles(e.target.files);
+                  e.target.value = "";
+                }}
+              />
+              <p className="mt-1 text-xs text-mist">
+                Clique na imagem para abrir em tamanho grande. Pode enviar várias.
+              </p>
+              {uploading && <p className="text-sm text-aqua">Enviando arte…</p>}
+              {uploadError && <p className="text-sm text-clay">{uploadError}</p>}
+            </Field>
+          </div>
+
           <div className="grid grid-cols-2 gap-3">
             <Field label="Data">
               <input
@@ -416,50 +482,7 @@ export function PostDrawer({ post, steps, members, onClose, onSaved }: Props) {
             />
           </Field>
 
-          <div>
-            <p className="mb-2 text-[11px] uppercase tracking-[0.16em] text-mist">
-              Arte da publicação
-            </p>
-            {files.length > 0 && (
-              <div className="mb-3 grid grid-cols-2 gap-2">
-                {files.map((file) => (
-                  <div key={file.id} className="relative overflow-hidden rounded-2xl bg-white">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={file.url} alt={file.file_name ?? "Arte"} className="h-32 w-full object-cover" />
-                    {canEdit && (
-                      <button
-                        type="button"
-                        onClick={() => void removeFile(file)}
-                        className="absolute right-2 top-2 rounded-full bg-deep/80 px-2 py-0.5 text-[11px] text-white"
-                      >
-                        Remover
-                      </button>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-            <Field label="Adicionar arte">
-              <input
-                type="file"
-                multiple
-                accept="image/png,image/jpeg,image/webp,image/gif"
-                disabled={!canEdit}
-                className="block w-full text-sm"
-                onChange={(e) => {
-                  void onFiles(e.target.files);
-                  e.target.value = "";
-                }}
-              />
-              <p className="mt-1 text-xs text-mist">
-                Feed, stories ou carrossel. Pode enviar várias imagens.
-              </p>
-              {uploading && <p className="text-sm text-aqua">Enviando arte…</p>}
-              {uploadError && <p className="text-sm text-clay">{uploadError}</p>}
-            </Field>
-          </div>
-
-          {(createdId || current) && (
+          {(postId) && (
             <div className="rounded-2xl border border-black/5 bg-white p-4">
               <p className="mb-3 text-[11px] uppercase tracking-[0.16em] text-mist">
                 Etapas de produção
@@ -528,9 +551,9 @@ export function PostDrawer({ post, steps, members, onClose, onSaved }: Props) {
               current.status !== "aguardando_aprovacao" && (
                 <GhostButton onClick={requestApproval}>Enviar para OK da gestão</GhostButton>
               )}
-            {isGestao && current?.status === "aguardando_aprovacao" && (
+            {isGestao && (current?.status === "aguardando_aprovacao" || form.status === "aguardando_aprovacao") && (
               <>
-                <PrimaryButton onClick={approve}>Aprovar produção</PrimaryButton>
+                <PrimaryButton onClick={approve}>Aprovar arte e publicação</PrimaryButton>
                 <GhostButton onClick={requestChanges}>Pedir alteração</GhostButton>
               </>
             )}
@@ -551,6 +574,26 @@ export function PostDrawer({ post, steps, members, onClose, onSaved }: Props) {
           </div>
         </div>
       </aside>
+      {viewer && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-deep/80 p-4">
+          <button
+            type="button"
+            className="absolute inset-0"
+            aria-label="Fechar arte"
+            onClick={() => setViewer(null)}
+          />
+          <div className="relative z-10 max-h-[90vh] w-full max-w-3xl overflow-auto rounded-3xl bg-white p-3">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={viewer.url} alt={viewer.file_name ?? "Arte"} className="mx-auto max-h-[80vh] w-auto max-w-full object-contain" />
+            <div className="mt-3 flex justify-end gap-2">
+              <a href={viewer.url} target="_blank" rel="noreferrer" className="rounded-full border border-black/10 px-4 py-2 text-sm">
+                Abrir original
+              </a>
+              <GhostButton onClick={() => setViewer(null)}>Fechar</GhostButton>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
