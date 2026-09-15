@@ -26,6 +26,7 @@ export type TeamMember = {
   phone: string | null;
   notes: string | null;
   color: string;
+  has_password?: boolean;
 };
 
 export type Deliverable = {

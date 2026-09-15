@@ -6,8 +6,8 @@ A equipe de marketing acompanha o calendário editorial, os briefings, os prazos
 
 ## Como usar
 
-1. Em **Equipe**, cadastre o e-mail de cada pessoa.
-2. Clique em **Entrar com e-mail** e informe o e-mail cadastrado. Um código chega no e-mail.
+1. Em **Equipe**, cadastre o e-mail e defina uma senha para cada pessoa.
+2. Clique em **Entrar** e use esse e-mail e senha.
 3. Só quem entrou consegue enviar para aprovação ou dar o OK.
 4. Em **Designs**, envie a prévia visual da arte para a gestão avaliar.
 5. A gestão aprova em **Aprovações**.

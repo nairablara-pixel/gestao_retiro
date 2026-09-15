@@ -27,8 +27,8 @@ export default function EquipePage() {
           <p className="text-[11px] uppercase tracking-[0.2em] text-aqua">Comunicação</p>
           <h1 className="font-display text-4xl">Equipe de marketing</h1>
           <p className="mt-2 max-w-xl text-mist">
-            Cadastre o e-mail de cada pessoa. É com esse e-mail que ela entra
-            para enviar à aprovação ou dar o OK.
+            Cadastre o e-mail e defina uma senha para cada pessoa. É com isso
+            que ela entra para enviar à aprovação ou dar o OK.
           </p>
         </div>
         {(role === "gestao" || role === "marketing") && (
@@ -38,9 +38,9 @@ export default function EquipePage() {
 
       {!role && (
         <p className="rounded-xl bg-white px-4 py-3 text-sm text-mist shadow-card">
-          Cadastre o e-mail de cada responsável. Em seguida,{" "}
+          Cadastre e-mail e senha de cada responsável. Em seguida,{" "}
           <Link href="/login" className="text-aqua underline">
-            entre com o seu e-mail
+            entre
           </Link>{" "}
           para enviar e aprovar.
         </p>
@@ -65,6 +65,9 @@ export default function EquipePage() {
             <p className="mt-1 text-sm text-mist">{member.title}</p>
             <p className="mt-2 text-sm text-tide">
               {member.email || "E-mail ainda não cadastrado"}
+            </p>
+            <p className="mt-1 text-xs text-mist">
+              {member.has_password ? "Senha definida" : "Ainda sem senha de acesso"}
             </p>
             {member.notes && <p className="mt-3 text-sm text-mist">{member.notes}</p>}
           </button>
@@ -104,9 +107,12 @@ function MemberDrawer({
     phone: current?.phone ?? "",
     notes: current?.notes ?? "",
     color: current?.color ?? "#1C6B78",
+    password: "",
   });
+  const [error, setError] = useState<string | null>(null);
 
   async function save() {
+    setError(null);
     const payload = {
       name: form.name,
       role: form.role,
@@ -116,8 +122,38 @@ function MemberDrawer({
       notes: form.notes || null,
       color: form.color,
     };
-    if (isNew) await supabase.from("team_members").insert(payload);
-    else await supabase.from("team_members").update(payload).eq("id", current!.id);
+    let memberId = current?.id;
+    if (isNew) {
+      const { data, error: insertError } = await supabase
+        .from("team_members")
+        .insert(payload)
+        .select("id")
+        .single();
+      if (insertError) {
+        setError(insertError.message);
+        return;
+      }
+      memberId = data.id;
+    } else {
+      const { error: updateError } = await supabase
+        .from("team_members")
+        .update(payload)
+        .eq("id", current!.id);
+      if (updateError) {
+        setError(updateError.message);
+        return;
+      }
+    }
+    if (form.password) {
+      const { error: passwordError } = await supabase.rpc("set_team_password", {
+        p_member_id: memberId,
+        p_password: form.password,
+      });
+      if (passwordError) {
+        setError(passwordError.message);
+        return;
+      }
+    }
     onSaved();
     onClose();
   }
@@ -146,6 +182,18 @@ function MemberDrawer({
         <Field label="E-mail">
           <input className={inputClass} value={form.email} disabled={!canEdit} onChange={(e) => setForm({ ...form, email: e.target.value })} />
         </Field>
+        <Field label={current?.has_password ? "Nova senha (opcional)" : "Senha de acesso"}>
+          <input
+            type="password"
+            minLength={6}
+            className={inputClass}
+            value={form.password}
+            disabled={!canEdit}
+            onChange={(e) => setForm({ ...form, password: e.target.value })}
+            placeholder={current?.has_password ? "Deixe em branco para manter" : "Mínimo 6 caracteres"}
+          />
+        </Field>
+        {error && <p className="text-sm text-clay">{error}</p>}
         <Field label="Telefone">
           <input className={inputClass} value={form.phone} disabled={!canEdit} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
         </Field>
