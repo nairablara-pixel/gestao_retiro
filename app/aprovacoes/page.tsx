@@ -40,9 +40,15 @@ export default function AprovacoesPage() {
           Nada vai para produção sem este OK — postagens, telão, lembrancinhas,
           press kit, cadernetas e flyers.
         </p>
-        {!isGestao && (
+        {!role && (
           <p className="mt-3 rounded-xl bg-[#f7ead0] px-4 py-2 text-sm text-[#7a5a12]">
-            Você está como {role}. Troque para Gestão principal no menu para aprovar.
+            Entre com o e-mail cadastrado na equipe para enviar ou aprovar.{" "}
+            <a href="/login" className="underline">Entrar</a>
+          </p>
+        )}
+        {role && !isGestao && (
+          <p className="mt-3 rounded-xl bg-[#f7ead0] px-4 py-2 text-sm text-[#7a5a12]">
+            Quem aprova é a gestão principal. Seu acesso atual não inclui o OK final.
           </p>
         )}
       </header>
@@ -76,18 +82,28 @@ export default function AprovacoesPage() {
       </section>
 
       <section>
-        <h2 className="font-display mb-3 text-2xl">Peças e materiais</h2>
+        <h2 className="font-display mb-3 text-2xl">Designs</h2>
         {pecaQueue.length === 0 ? (
           <p className="rounded-3xl bg-white p-6 text-mist shadow-card">
-            Nenhuma peça esperando OK agora.
+            Nenhum design esperando OK agora.
           </p>
         ) : (
           <div className="grid gap-3">
             {pecaQueue.map((item) => (
               <article key={item.id} className="flex flex-wrap items-center justify-between gap-3 rounded-3xl bg-white p-5 shadow-card">
-                <div>
-                  <p className="font-medium">{item.title}</p>
-                  <p className="text-sm text-mist">{item.description}</p>
+                <div className="flex items-center gap-4">
+                  {item.preview_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={item.preview_url} alt="" className="h-16 w-16 rounded-xl object-cover" />
+                  ) : (
+                    <div className="grid h-16 w-16 place-items-center rounded-xl bg-foam text-[10px] text-mist">
+                      Sem prévia
+                    </div>
+                  )}
+                  <div>
+                    <p className="font-medium">{item.title}</p>
+                    <p className="text-sm text-mist">{item.description}</p>
+                  </div>
                 </div>
                 <div className="flex items-center gap-3">
                   <span className="text-sm text-mist">{DELIVERABLE_STATUS_LABEL[item.status]}</span>

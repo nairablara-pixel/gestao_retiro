@@ -12,3 +12,5 @@ tmp-verify/
 print*.jpg
 print*.jpg.png
 print*.png
+
+.vercel

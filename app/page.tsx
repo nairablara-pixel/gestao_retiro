@@ -89,10 +89,10 @@ export default function PainelPage() {
           </Link>
         </article>
         <article className="rounded-3xl bg-white p-5 shadow-card">
-          <p className="text-[11px] uppercase tracking-[0.16em] text-mist">Peças em aberto</p>
+          <p className="text-[11px] uppercase tracking-[0.16em] text-mist">Designs em aberto</p>
           <p className="font-display mt-2 text-4xl">{pecasPendentes.length}</p>
-          <Link href="/pecas" className="mt-2 inline-block text-sm text-aqua underline">
-            Ver telão, lembrancinhas e impressos
+          <Link href="/designs" className="mt-2 inline-block text-sm text-aqua underline">
+            Ver designs e prévias
           </Link>
         </article>
       </section>
@@ -133,7 +133,7 @@ export default function PainelPage() {
       </section>
 
       <section>
-        <h2 className="font-display mb-3 text-2xl">Peças do evento</h2>
+        <h2 className="font-display mb-3 text-2xl">Designs do evento</h2>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {deliverables.slice(0, 6).map((item) => (
             <article key={item.id} className="rounded-2xl bg-white p-4 shadow-card">

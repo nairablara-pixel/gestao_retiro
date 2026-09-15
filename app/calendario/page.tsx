@@ -64,7 +64,9 @@ export default function CalendarioPage() {
             Editável pela equipe. Produção só depois do OK da gestão principal.
           </p>
         </div>
-        <PrimaryButton onClick={() => setOpen("new")}>Nova publicação</PrimaryButton>
+        {(role === "gestao" || role === "marketing") && (
+          <PrimaryButton onClick={() => setOpen("new")}>Nova publicação</PrimaryButton>
+        )}
       </header>
 
       <div className="flex flex-wrap gap-2">

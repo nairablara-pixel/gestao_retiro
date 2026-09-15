@@ -18,7 +18,7 @@ type Props = {
   post: EditorialPost | "new" | null;
   steps: ProductionStep[];
   members: TeamMember[];
-  role: Role;
+  role: Role | null;
   onClose: () => void;
   onSaved: () => void;
 };
@@ -47,6 +47,7 @@ export function PostDrawer({ post, steps, members, role, onClose, onSaved }: Pro
   const [comment, setComment] = useState("");
   const [saving, setSaving] = useState(false);
   const canEdit = role === "gestao" || role === "marketing" || role === "design";
+  const canSendApproval = canEdit;
   const isGestao = role === "gestao";
 
   useEffect(() => {
@@ -380,11 +381,22 @@ export function PostDrawer({ post, steps, members, role, onClose, onSaved }: Pro
             />
           </Field>
 
+          {!role && (
+            <p className="rounded-xl bg-[#f7ead0] px-4 py-2 text-sm text-[#7a5a12]">
+              Entre com o e-mail cadastrado na equipe para salvar, enviar para
+              OK ou aprovar.{" "}
+              <a href="/login" className="underline">
+                Entrar
+              </a>
+            </p>
+          )}
+
           <div className="flex flex-wrap gap-2 border-t border-black/5 pt-4">
             <PrimaryButton disabled={!canEdit || saving} onClick={() => save()}>
               {saving ? "Salvando…" : "Salvar alterações"}
             </PrimaryButton>
-            {!isNew && (role === "marketing" || role === "design" || isGestao) &&
+            {!isNew &&
+              canSendApproval &&
               current &&
               current.status !== "publicado" &&
               current.status !== "aguardando_aprovacao" && (

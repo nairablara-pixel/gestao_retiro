@@ -6,11 +6,11 @@ A equipe de marketing acompanha o calendário editorial, os briefings, os prazos
 
 ## Como usar
 
-1. Abra o site.
-2. No menu, escolha **entrar como** Gestão, Marketing ou Design.
-3. No **Calendário**, clique em uma postagem para editar briefing, texto, design e etapas.
-4. Quando estiver pronta, envie para **OK da gestão**.
-5. A gestão aprova ou pede alteração em **Aprovações**.
+1. Em **Equipe**, cadastre o e-mail de cada pessoa.
+2. Clique em **Entrar com e-mail** e informe o e-mail cadastrado. Um código chega no e-mail.
+3. Só quem entrou consegue enviar para aprovação ou dar o OK.
+4. Em **Designs**, envie a prévia visual da arte para a gestão avaliar.
+5. A gestão aprova em **Aprovações**.
 
 ## Desenvolvimento
 

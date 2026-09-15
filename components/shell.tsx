@@ -2,20 +2,20 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useRole } from "./providers";
-import { ROLE_LABEL, VIEW_ROLES } from "@/lib/labels";
+import { useAuth } from "./providers";
+import { ROLE_LABEL } from "@/lib/labels";
 
 const NAV = [
   { href: "/", label: "Painel" },
   { href: "/calendario", label: "Calendário" },
-  { href: "/pecas", label: "Peças" },
+  { href: "/designs", label: "Designs" },
   { href: "/equipe", label: "Equipe" },
   { href: "/aprovacoes", label: "Aprovações" },
 ];
 
 export function Shell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { role, setRole } = useRole();
+  const { member, role, signOut, loading } = useAuth();
 
   return (
     <div className="min-h-screen lg:grid lg:grid-cols-[260px_1fr]">
@@ -58,43 +58,54 @@ export function Shell({ children }: { children: React.ReactNode }) {
         </nav>
         <div className="hidden px-6 pb-8 lg:block">
           <p className="mb-2 text-[11px] uppercase tracking-[0.22em] text-foam/50">
-            Entrar como
+            Entrar
           </p>
-          <div className="space-y-1.5">
-            {VIEW_ROLES.map((r) => (
+          {loading ? (
+            <p className="text-sm text-foam/60">Verificando sessão…</p>
+          ) : member && role ? (
+            <div className="rounded-2xl bg-white/5 p-3">
+              <p className="font-medium text-pearl">{member.name}</p>
+              <p className="text-[11px] text-foam/70">{ROLE_LABEL[role]}</p>
+              <p className="mt-1 truncate text-[11px] text-foam/50">{member.email}</p>
               <button
-                key={r.id}
                 type="button"
-                onClick={() => setRole(r.id)}
-                className={`block w-full rounded-xl px-3 py-2 text-left text-sm ${
-                  role === r.id
-                    ? "bg-aqua text-white"
-                    : "bg-white/5 text-foam/80 hover:bg-white/10"
-                }`}
+                onClick={() => void signOut()}
+                className="mt-3 text-sm text-gold underline"
               >
-                <span className="block font-medium">{ROLE_LABEL[r.id]}</span>
-                <span className="block text-[11px] opacity-80">{r.hint}</span>
+                Sair
               </button>
-            ))}
-          </div>
+            </div>
+          ) : (
+            <Link
+              href="/login"
+              className="block rounded-xl bg-aqua px-3 py-2 text-center text-sm font-medium text-white"
+            >
+              Entrar com e-mail
+            </Link>
+          )}
         </div>
       </aside>
 
       <div className="min-w-0">
         <div className="wave-line h-10 border-b border-black/5 lg:h-14" />
         <div className="flex items-center justify-between gap-3 border-b border-black/5 bg-pearl/70 px-4 py-3 lg:hidden">
-          <p className="text-sm text-mist">Você está como</p>
-          <select
-            value={role}
-            onChange={(e) => setRole(e.target.value as typeof role)}
-            className="rounded-full border border-black/10 bg-white px-3 py-1.5 text-sm"
-          >
-            {VIEW_ROLES.map((r) => (
-              <option key={r.id} value={r.id}>
-                {ROLE_LABEL[r.id]}
-              </option>
-            ))}
-          </select>
+          {member && role ? (
+            <>
+              <p className="truncate text-sm">
+                {member.name} · {ROLE_LABEL[role]}
+              </p>
+              <button type="button" className="text-sm text-aqua underline" onClick={() => void signOut()}>
+                Sair
+              </button>
+            </>
+          ) : (
+            <>
+              <p className="text-sm text-mist">Você não entrou</p>
+              <Link href="/login" className="rounded-full bg-tide px-3 py-1.5 text-sm text-white">
+                Entrar
+              </Link>
+            </>
+          )}
         </div>
         <main className="px-4 py-6 sm:px-6 lg:px-10 lg:py-8">{children}</main>
       </div>

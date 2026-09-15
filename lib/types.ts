@@ -38,6 +38,7 @@ export type Deliverable = {
   due_date: string | null;
   quantity: string | null;
   notes: string | null;
+  preview_url: string | null;
 };
 
 export type EditorialPost = {

@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { useRole } from "@/components/providers";
+import Link from "next/link";
+import { useAuth } from "@/components/providers";
 import { Field, GhostButton, PrimaryButton, inputClass } from "@/components/ui";
 import { useRetiroData } from "@/lib/use-data";
 import { ROLE_LABEL } from "@/lib/labels";
@@ -12,9 +13,9 @@ const ROLES: Role[] = ["gestao", "marketing", "design", "redacao", "audiovisual"
 
 export default function EquipePage() {
   const { members, loading, error, refresh } = useRetiroData();
-  const { role } = useRole();
+  const { role } = useAuth();
   const [open, setOpen] = useState<TeamMember | "new" | null>(null);
-  const canEdit = role === "gestao" || role === "marketing";
+  const canEdit = role === "gestao" || role === "marketing" || !role;
 
   if (loading) return <p className="text-mist">Carregando equipe…</p>;
   if (error) return <p className="text-clay">{error}</p>;
@@ -26,12 +27,24 @@ export default function EquipePage() {
           <p className="text-[11px] uppercase tracking-[0.2em] text-aqua">Comunicação</p>
           <h1 className="font-display text-4xl">Equipe de marketing</h1>
           <p className="mt-2 max-w-xl text-mist">
-            Quem briefa, quem desenha, quem aprova. Troque os nomes placeholder
-            pelos nomes reais da equipe.
+            Cadastre o e-mail de cada pessoa. É com esse e-mail que ela entra
+            para enviar à aprovação ou dar o OK.
           </p>
         </div>
-        {canEdit && <PrimaryButton onClick={() => setOpen("new")}>Adicionar pessoa</PrimaryButton>}
+        {(role === "gestao" || role === "marketing") && (
+          <PrimaryButton onClick={() => setOpen("new")}>Adicionar pessoa</PrimaryButton>
+        )}
       </header>
+
+      {!role && (
+        <p className="rounded-xl bg-white px-4 py-3 text-sm text-mist shadow-card">
+          Cadastre o e-mail de cada responsável. Em seguida,{" "}
+          <Link href="/login" className="text-aqua underline">
+            entre com o seu e-mail
+          </Link>{" "}
+          para enviar e aprovar.
+        </p>
+      )}
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {members.map((member) => (
@@ -50,6 +63,9 @@ export default function EquipePage() {
             <h2 className="font-display text-2xl leading-tight">{member.name}</h2>
             <p className="text-sm text-aqua">{ROLE_LABEL[member.role]}</p>
             <p className="mt-1 text-sm text-mist">{member.title}</p>
+            <p className="mt-2 text-sm text-tide">
+              {member.email || "E-mail ainda não cadastrado"}
+            </p>
             {member.notes && <p className="mt-3 text-sm text-mist">{member.notes}</p>}
           </button>
         ))}
@@ -95,7 +111,7 @@ function MemberDrawer({
       name: form.name,
       role: form.role,
       title: form.title,
-      email: form.email || null,
+      email: form.email.trim().toLowerCase() || null,
       phone: form.phone || null,
       notes: form.notes || null,
       color: form.color,
