@@ -1,0 +1,210 @@
+"use client";
+
+import { useState } from "react";
+import { useRole } from "@/components/providers";
+import { Field, GhostButton, PrimaryButton, inputClass } from "@/components/ui";
+import { useRetiroData } from "@/lib/use-data";
+import {
+  CATEGORY_LABEL,
+  DELIVERABLE_STATUS_LABEL,
+  formatDate,
+} from "@/lib/labels";
+import type { Deliverable, DeliverableStatus } from "@/lib/types";
+import { supabase } from "@/lib/supabase";
+
+const STATUSES: DeliverableStatus[] = [
+  "nao_iniciado",
+  "briefing",
+  "producao",
+  "aguardando_aprovacao",
+  "aprovado",
+  "concluido",
+];
+
+export default function PecasPage() {
+  const { deliverables, members, loading, error, refresh } = useRetiroData();
+  const { role } = useRole();
+  const [open, setOpen] = useState<Deliverable | "new" | null>(null);
+  const canEdit = role === "gestao" || role === "design" || role === "marketing";
+
+  if (loading) return <p className="text-mist">Carregando peças…</p>;
+  if (error) return <p className="text-clay">{error}</p>;
+
+  const byCategory = Object.entries(
+    deliverables.reduce<Record<string, Deliverable[]>>((acc, item) => {
+      acc[item.category] = acc[item.category] || [];
+      acc[item.category].push(item);
+      return acc;
+    }, {}),
+  );
+
+  return (
+    <div className="space-y-6">
+      <header className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <p className="text-[11px] uppercase tracking-[0.2em] text-aqua">
+            Produção do dia
+          </p>
+          <h1 className="font-display text-4xl">Peças e materiais</h1>
+          <p className="mt-2 max-w-xl text-mist">
+            Telão, identidade, flyers, press kit, cadernetas, lembrancinhas e
+            artes digitais. Nenhuma peça entra em produção sem OK da gestão.
+          </p>
+        </div>
+        {canEdit && <PrimaryButton onClick={() => setOpen("new")}>Nova peça</PrimaryButton>}
+      </header>
+
+      {byCategory.map(([category, items]) => (
+        <section key={category}>
+          <h2 className="font-display mb-3 text-2xl">
+            {CATEGORY_LABEL[category] ?? category}
+          </h2>
+          <div className="grid gap-3 md:grid-cols-2">
+            {items.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => setOpen(item)}
+                className="rounded-3xl bg-white p-5 text-left shadow-card hover:ring-2 hover:ring-gold/40"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <h3 className="font-medium">{item.title}</h3>
+                  <span className="rounded-full bg-foam px-2.5 py-0.5 text-[11px] text-tide">
+                    {DELIVERABLE_STATUS_LABEL[item.status]}
+                  </span>
+                </div>
+                <p className="mt-2 text-sm text-mist">{item.description}</p>
+                <p className="mt-3 text-xs text-mist">
+                  {item.due_date ? `Prazo ${formatDate(item.due_date)}` : "Sem prazo"}
+                  {item.quantity ? ` · ${item.quantity}` : ""}
+                </p>
+              </button>
+            ))}
+          </div>
+        </section>
+      ))}
+
+      {open && (
+        <DeliverableDrawer
+          item={open}
+          members={members}
+          canEdit={canEdit}
+          isGestao={role === "gestao"}
+          onClose={() => setOpen(null)}
+          onSaved={refresh}
+        />
+      )}
+    </div>
+  );
+}
+
+function DeliverableDrawer({
+  item,
+  members,
+  canEdit,
+  isGestao,
+  onClose,
+  onSaved,
+}: {
+  item: Deliverable | "new";
+  members: { id: string; name: string; title: string }[];
+  canEdit: boolean;
+  isGestao: boolean;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const isNew = item === "new";
+  const current = isNew ? null : item;
+  const [form, setForm] = useState({
+    title: current?.title ?? "",
+    category: current?.category ?? "digital",
+    description: current?.description ?? "",
+    status: current?.status ?? "nao_iniciado",
+    assignee_id: current?.assignee_id ?? "",
+    due_date: current?.due_date ?? "",
+    quantity: current?.quantity ?? "",
+    notes: current?.notes ?? "",
+  });
+  const [saving, setSaving] = useState(false);
+
+  async function save(status = form.status) {
+    setSaving(true);
+    const payload = {
+      title: form.title,
+      category: form.category,
+      description: form.description || null,
+      status,
+      assignee_id: form.assignee_id || null,
+      due_date: form.due_date || null,
+      quantity: form.quantity || null,
+      notes: form.notes || null,
+    };
+    if (isNew) await supabase.from("deliverables").insert(payload);
+    else await supabase.from("deliverables").update(payload).eq("id", current!.id);
+    setSaving(false);
+    onSaved();
+    onClose();
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex justify-end bg-deep/40">
+      <button className="h-full flex-1" aria-label="Fechar" onClick={onClose} />
+      <aside className="h-full w-full max-w-lg space-y-4 overflow-y-auto bg-pearl p-5 shadow-card">
+        <div className="flex items-center justify-between">
+          <h2 className="font-display text-2xl">{isNew ? "Nova peça" : form.title}</h2>
+          <GhostButton onClick={onClose}>Fechar</GhostButton>
+        </div>
+        <Field label="Título">
+          <input className={inputClass} value={form.title} disabled={!canEdit} onChange={(e) => setForm({ ...form, title: e.target.value })} />
+        </Field>
+        <Field label="Categoria">
+          <select className={inputClass} value={form.category} disabled={!canEdit} onChange={(e) => setForm({ ...form, category: e.target.value })}>
+            {Object.entries(CATEGORY_LABEL).map(([k, v]) => (
+              <option key={k} value={k}>{v}</option>
+            ))}
+          </select>
+        </Field>
+        <Field label="Descrição">
+          <textarea className={inputClass} rows={3} value={form.description} disabled={!canEdit} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+        </Field>
+        <Field label="Status">
+          <select className={inputClass} value={form.status} disabled={!canEdit} onChange={(e) => setForm({ ...form, status: e.target.value as DeliverableStatus })}>
+            {STATUSES.map((s) => (
+              <option key={s} value={s}>{DELIVERABLE_STATUS_LABEL[s]}</option>
+            ))}
+          </select>
+        </Field>
+        <Field label="Responsável">
+          <select className={inputClass} value={form.assignee_id} disabled={!canEdit} onChange={(e) => setForm({ ...form, assignee_id: e.target.value })}>
+            <option value="">Sem responsável</option>
+            {members.map((m) => (
+              <option key={m.id} value={m.id}>{m.name} · {m.title}</option>
+            ))}
+          </select>
+        </Field>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Prazo">
+            <input type="date" className={inputClass} value={form.due_date} disabled={!canEdit} onChange={(e) => setForm({ ...form, due_date: e.target.value })} />
+          </Field>
+          <Field label="Quantidade">
+            <input className={inputClass} value={form.quantity} disabled={!canEdit} onChange={(e) => setForm({ ...form, quantity: e.target.value })} />
+          </Field>
+        </div>
+        <Field label="Notas">
+          <textarea className={inputClass} rows={3} value={form.notes} disabled={!canEdit} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
+        </Field>
+        <div className="flex flex-wrap gap-2">
+          <PrimaryButton disabled={!canEdit || saving} onClick={() => save()}>
+            Salvar
+          </PrimaryButton>
+          {canEdit && !isNew && form.status !== "aguardando_aprovacao" && form.status !== "concluido" && (
+            <GhostButton onClick={() => save("aguardando_aprovacao")}>Pedir OK da gestão</GhostButton>
+          )}
+          {isGestao && form.status === "aguardando_aprovacao" && (
+            <PrimaryButton onClick={() => save("aprovado")}>Aprovar peça</PrimaryButton>
+          )}
+        </div>
+      </aside>
+    </div>
+  );
+}

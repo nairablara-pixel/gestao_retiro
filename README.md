@@ -1,20 +1,27 @@
-# Gestão do Retiro de Mulheres
+# Sobre as Águas — Gestão do retiro
 
-Site e sistema para organizar o retiro de mulheres: participantes, equipes, programação e hospedagem.
+Painel interno do Retiro de Mulheres de Santa Maria (14/11/2026, Park Hotel Morotin).
 
-## Status
+A equipe de marketing acompanha o calendário editorial, os briefings, os prazos e as peças do dia (telão, flyers, press kit, cadernetas, lembrancinhas). A gestão principal dá o OK antes de qualquer produção.
 
-Primeira publicação no GitHub para conectar o deploy no [Vercel](https://vercel.com).
+## Como usar
 
-## Como conectar o Vercel
+1. Abra o site.
+2. No menu, escolha **entrar como** Gestão, Marketing ou Design.
+3. No **Calendário**, clique em uma postagem para editar briefing, texto, design e etapas.
+4. Quando estiver pronta, envie para **OK da gestão**.
+5. A gestão aprova ou pede alteração em **Aprovações**.
 
-1. Acesse [vercel.com](https://vercel.com) e entre com a conta GitHub `nairablara-pixel`.
-2. Clique em **Add New… → Project**.
-3. Importe o repositório `gestao_retiro`.
-4. Deixe as configurações padrão (site estático) e clique em **Deploy**.
+## Desenvolvimento
 
-A cada novo commit na branch `main`, o Vercel publica automaticamente.
+```bash
+npm install
+npm run dev
+```
 
-## Desenvolvimento local
+Variáveis em `.env.local`:
 
-Abra `index.html` no navegador, ou sirva a pasta com qualquer servidor estático.
+```
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+```

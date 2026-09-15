@@ -1,0 +1,62 @@
+"use client";
+
+import { useCallback, useEffect, useState } from "react";
+import { supabase } from "./supabase";
+import type {
+  Deliverable,
+  EditorialPost,
+  EventSettings,
+  ProductionStep,
+  TeamMember,
+} from "./types";
+
+export function useRetiroData() {
+  const [settings, setSettings] = useState<EventSettings | null>(null);
+  const [members, setMembers] = useState<TeamMember[]>([]);
+  const [posts, setPosts] = useState<EditorialPost[]>([]);
+  const [steps, setSteps] = useState<ProductionStep[]>([]);
+  const [deliverables, setDeliverables] = useState<Deliverable[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const refresh = useCallback(async () => {
+    setError(null);
+    const [s, m, p, st, d] = await Promise.all([
+      supabase.from("event_settings").select("*").eq("id", 1).single(),
+      supabase.from("team_members").select("*").order("created_at"),
+      supabase.from("editorial_posts").select("*").order("sort_order"),
+      supabase.from("production_steps").select("*").order("sort_order"),
+      supabase.from("deliverables").select("*").order("due_date"),
+    ]);
+
+    const firstError =
+      s.error?.message ||
+      m.error?.message ||
+      p.error?.message ||
+      st.error?.message ||
+      d.error?.message;
+    if (firstError) setError(firstError);
+
+    if (s.data) setSettings(s.data as EventSettings);
+    if (m.data) setMembers(m.data as TeamMember[]);
+    if (p.data) setPosts(p.data as EditorialPost[]);
+    if (st.data) setSteps(st.data as ProductionStep[]);
+    if (d.data) setDeliverables(d.data as Deliverable[]);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
+  return {
+    settings,
+    members,
+    posts,
+    steps,
+    deliverables,
+    loading,
+    error,
+    refresh,
+  };
+}

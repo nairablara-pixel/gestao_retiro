@@ -3,6 +3,12 @@ Thumbs.db
 .env
 .env.local
 node_modules/
+.next/
+.grok/
+tmp-verify/
 .vercel
 .idea/
 .vscode/
+print*.jpg
+print*.jpg.png
+print*.png
